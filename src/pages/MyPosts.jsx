@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Table, Badge, Button, Alert, Spinner } from 'react-bootstrap';
+import { Container, Row, Col, Card, Table, Badge, Button, Alert, Spinner, Modal } from 'react-bootstrap';
 import { LinkContainer } from 'react-router-bootstrap';
 import { foodService } from '../services/foodService';
 
@@ -7,6 +7,11 @@ const MyPosts = () => {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // Add modal states
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [postToDelete, setPostToDelete] = useState(null);
+  const [successMessage, setSuccessMessage] = useState('');
 
   // Fetch user's food posts from API
   useEffect(() => {
@@ -40,7 +45,7 @@ const MyPosts = () => {
   const handleDeletePost = async (postId) => {
     const post = posts.find(p => p.id === postId);
     
-    // Check if post can be deleted before making API call
+    // Check if post can be deleted before showing modal
     if (post?.status === 'claimed') {
       setError('Cannot delete a post that has been claimed. Once claimed, the food should be picked up.');
       return;
@@ -51,33 +56,46 @@ const MyPosts = () => {
       return;
     }
 
-    if (window.confirm('Are you sure you want to delete this post? This action cannot be undone.')) {
-      try {
-        setError(''); // Clear any previous errors
-        await foodService.deleteFoodPost(postId);
-        setPosts(posts.filter(post => post.id !== postId));
-        // Show success message briefly
-        alert('Post deleted successfully!');
-      } catch (error) {
-        console.error('Error deleting post:', error);
-        
-        // More specific error messages based on response
-        if (error.response?.status === 403) {
-          setError('You can only delete your own posts.');
-        } else if (error.response?.status === 400) {
-          setError(error.response?.data?.error || 'Cannot delete this post. It may have been claimed by someone.');
-        } else if (error.response?.status === 404) {
-          setError('Post not found. It may have already been deleted.');
-        } else if (error.response?.status === 401) {
-          setError('Authentication failed. Please log in again.');
-          // Optionally redirect to login
-          setTimeout(() => {
-            window.location.href = '/login';
-          }, 2000);
-        } else {
-          const errorMessage = error.response?.data?.error || 'Failed to delete post. Please try again.';
-          setError(errorMessage);
-        }
+    // Show custom delete confirmation modal
+    setPostToDelete(post);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!postToDelete) return;
+
+    try {
+      setError(''); // Clear any previous errors
+      setShowDeleteModal(false); // Close delete modal
+      
+      await foodService.deleteFoodPost(postToDelete.id);
+      setPosts(posts.filter(post => post.id !== postToDelete.id));
+      
+      // Show custom success modal
+      setSuccessMessage('Post deleted successfully!');
+      setShowSuccessModal(true);
+      
+      setPostToDelete(null);
+    } catch (error) {
+      console.error('Error deleting post:', error);
+      setPostToDelete(null);
+      
+      // More specific error messages based on response
+      if (error.response?.status === 403) {
+        setError('You can only delete your own posts.');
+      } else if (error.response?.status === 400) {
+        setError(error.response?.data?.error || 'Cannot delete this post. It may have been claimed by someone.');
+      } else if (error.response?.status === 404) {
+        setError('Post not found. It may have already been deleted.');
+      } else if (error.response?.status === 401) {
+        setError('Authentication failed. Please log in again.');
+        // Optionally redirect to login
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 2000);
+      } else {
+        const errorMessage = error.response?.data?.error || 'Failed to delete post. Please try again.';
+        setError(errorMessage);
       }
     }
   };
@@ -89,7 +107,10 @@ const MyPosts = () => {
       setPosts(posts.map(post => 
         post.id === postId ? { ...post, status: 'completed' } : post
       ));
-      alert('Post marked as completed!');
+      
+      // Show custom success modal
+      setSuccessMessage('Post marked as completed!');
+      setShowSuccessModal(true);
     } catch (error) {
       console.error('Error updating post status:', error);
       const errorMessage = error.response?.data?.error || 'Failed to update post status. Please try again.';
@@ -255,6 +276,54 @@ const MyPosts = () => {
           </Col>
         </Row>
       )}
+
+      {/* Custom Delete Confirmation Modal */}
+      <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Confirm Delete</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <div className="text-center">
+            <div className="mb-3">
+              <i className="fas fa-exclamation-triangle text-warning" style={{fontSize: '3rem'}}></i>
+            </div>
+            <h5>Are you sure you want to delete this post?</h5>
+            {postToDelete && (
+              <p className="text-muted mb-3">
+                "{postToDelete.title}" - This action cannot be undone.
+              </p>
+            )}
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>
+            Cancel
+          </Button>
+          <Button variant="danger" onClick={confirmDelete}>
+            Delete Post
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Custom Success Modal */}
+      <Modal show={showSuccessModal} onHide={() => setShowSuccessModal(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Success</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <div className="text-center">
+            <div className="mb-3">
+              <i className="fas fa-check-circle text-success" style={{fontSize: '3rem'}}></i>
+            </div>
+            <h5>{successMessage}</h5>
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="success" onClick={() => setShowSuccessModal(false)}>
+            OK
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </Container>
   );
 };

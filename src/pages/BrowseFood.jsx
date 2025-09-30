@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Button, Form, Badge, Alert, Spinner } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Form, Badge, Alert, Spinner, Modal } from 'react-bootstrap';
 import { foodService } from '../services/foodService';
 import { useAuth } from '../context/AuthContext';
 
@@ -10,6 +10,13 @@ const BrowseFood = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [claimingId, setClaimingId] = useState(null);
+  
+  // Modal states
+  const [showClaimModal, setShowClaimModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [donationToClaim, setDonationToClaim] = useState(null);
+  const [successMessage, setSuccessMessage] = useState('');
+  
   const { user } = useAuth();
 
   // Fetch donations from API
@@ -48,25 +55,38 @@ const BrowseFood = () => {
       return;
     }
 
+    const donation = donations.find(d => d.id === donationId);
+    setDonationToClaim(donation);
+    setShowClaimModal(true);
+  };
+
+  const confirmClaim = async () => {
+    if (!donationToClaim) return;
+
     try {
-      setClaimingId(donationId);
+      setClaimingId(donationToClaim.id);
       setError('');
+      setShowClaimModal(false);
       
-      const response = await foodService.claimFood(donationId);
+      const response = await foodService.claimFood(donationToClaim.id);
       
       // Update the donations list to reflect the claimed status
       setDonations(prevDonations => 
         prevDonations.map(donation => 
-          donation.id === donationId 
+          donation.id === donationToClaim.id 
             ? { ...donation, status: 'claimed', claimed_by: user.id }
             : donation
         )
       );
       
-      // Show success message
-      alert('Food donation claimed successfully! You can view it in "My Claims" page. The restaurant will be notified.');
+      // Show success modal
+      setSuccessMessage('Food donation claimed successfully! You can view it in "My Claims" page. The restaurant will be notified.');
+      setShowSuccessModal(true);
+      
+      setDonationToClaim(null);
     } catch (error) {
       console.error('Error claiming food:', error);
+      setDonationToClaim(null);
       
       // Better error handling
       if (error.response?.status === 403) {
@@ -216,6 +236,57 @@ const BrowseFood = () => {
           ))
         )}
       </Row>
+
+      {/* Custom Claim Confirmation Modal */}
+      <Modal show={showClaimModal} onHide={() => setShowClaimModal(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Claim Food Donation</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <div className="text-center">
+            <div className="mb-3">
+              <i className="fas fa-hand-holding-heart text-primary" style={{fontSize: '3rem'}}></i>
+            </div>
+            <h5>Confirm your claim for this donation</h5>
+            {donationToClaim && (
+              <div className="text-muted mb-3">
+                <p><strong>Food Item:</strong> {donationToClaim.title}</p>
+                <p><strong>Quantity:</strong> {donationToClaim.quantity}</p>
+                <p><strong>Restaurant:</strong> {donationToClaim.postedBy || donationToClaim.restaurant?.name || 'Restaurant'}</p>
+                <p className="small">The restaurant will be notified of your claim and you can coordinate pickup details.</p>
+              </div>
+            )}
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowClaimModal(false)}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={confirmClaim}>
+            Confirm Claim
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Custom Success Modal */}
+      <Modal show={showSuccessModal} onHide={() => setShowSuccessModal(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Claim Successful</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <div className="text-center">
+            <div className="mb-3">
+              <i className="fas fa-check-circle text-success" style={{fontSize: '3rem'}}></i>
+            </div>
+            <h5>{successMessage}</h5>
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="success" onClick={() => setShowSuccessModal(false)}>
+            OK
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </Container>
   );
 };

@@ -1,11 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Table, Badge, Button, Alert, Spinner } from 'react-bootstrap';
+import { Container, Row, Col, Card, Table, Badge, Button, Alert, Spinner, Modal } from 'react-bootstrap';
 import { foodService } from '../services/foodService';
 
 const MyClaims = () => {
   const [claims, setClaims] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // Add modal states
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showInfoModal, setShowInfoModal] = useState(false);
+  const [claimToCancel, setClaimToCancel] = useState(null);
+  const [modalMessage, setModalMessage] = useState('');
 
   // Fetch user claims from API
   useEffect(() => {
@@ -52,13 +58,30 @@ const MyClaims = () => {
   };
 
   const handleCancelClaim = async (claimId) => {
+    const claim = claims.find(c => c.id === claimId);
+    
+    // Show custom cancel confirmation modal
+    setClaimToCancel(claim);
+    setShowCancelModal(true);
+  };
+
+  const confirmCancelClaim = async () => {
+    if (!claimToCancel) return;
+
     try {
+      setShowCancelModal(false); // Close cancel modal
+      
       // TODO: Implement cancel claim API call when backend supports it
-      console.log('Cancel claim functionality to be implemented:', claimId);
-      // For now, just show a message
-      alert('Cancel claim functionality will be implemented soon.');
+      console.log('Cancel claim functionality to be implemented:', claimToCancel.id);
+      
+      // For now, show info modal instead of success since it's not implemented
+      setModalMessage('Cancel claim functionality will be implemented soon. This feature is currently under development.');
+      setShowInfoModal(true);
+      
+      setClaimToCancel(null);
     } catch (error) {
       console.error('Error cancelling claim:', error);
+      setClaimToCancel(null);
       setError('Failed to cancel claim. Please try again.');
     }
   };
@@ -193,6 +216,76 @@ const MyClaims = () => {
           </Col>
         </Row>
       )}
+
+      {/* Custom Cancel Confirmation Modal */}
+      <Modal show={showCancelModal} onHide={() => setShowCancelModal(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Cancel Claim</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <div className="text-center">
+            <div className="mb-3">
+              <i className="fas fa-question-circle text-warning" style={{fontSize: '3rem'}}></i>
+            </div>
+            <h5>Are you sure you want to cancel this claim?</h5>
+            {claimToCancel && (
+              <div className="text-muted mb-3">
+                <p><strong>Food Item:</strong> {claimToCancel.title}</p>
+                <p><strong>Restaurant:</strong> {claimToCancel.restaurant?.name || 'N/A'}</p>
+                <p className="small">This action will make the food available for others to claim.</p>
+              </div>
+            )}
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowCancelModal(false)}>
+            Keep Claim
+          </Button>
+          <Button variant="danger" onClick={confirmCancelClaim}>
+            Cancel Claim
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Custom Success Modal */}
+      <Modal show={showSuccessModal} onHide={() => setShowSuccessModal(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Success</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <div className="text-center">
+            <div className="mb-3">
+              <i className="fas fa-check-circle text-success" style={{fontSize: '3rem'}}></i>
+            </div>
+            <h5>{modalMessage}</h5>
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="success" onClick={() => setShowSuccessModal(false)}>
+            OK
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Custom Info Modal */}
+      <Modal show={showInfoModal} onHide={() => setShowInfoModal(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Information</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <div className="text-center">
+            <div className="mb-3">
+              <i className="fas fa-info-circle text-primary" style={{fontSize: '3rem'}}></i>
+            </div>
+            <h5>{modalMessage}</h5>
+          </div>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="primary" onClick={() => setShowInfoModal(false)}>
+            OK
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </Container>
   );
 };
