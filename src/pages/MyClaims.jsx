@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Table, Badge, Button, Alert, Spinner, Modal } from 'react-bootstrap';
+import { LinkContainer } from 'react-router-bootstrap';
+import { useAuth } from '../context/AuthContext';
 import { foodService } from '../services/foodService';
+import ReportModal from '../components/ReportModal';
 
 const MyClaims = () => {
   const [claims, setClaims] = useState([]);
@@ -12,6 +15,13 @@ const MyClaims = () => {
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [claimToCancel, setClaimToCancel] = useState(null);
   const [modalMessage, setModalMessage] = useState('');
+
+  // Report modal state
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportTarget, setReportTarget] = useState(null);
+  const [reportSuccess, setReportSuccess] = useState('');
+
+  const { user } = useAuth();
 
   // Fetch user claims from API
   useEffect(() => {
@@ -86,6 +96,21 @@ const MyClaims = () => {
     }
   };
 
+  const handleReportRestaurant = (restaurant) => {
+    setReportTarget({
+      type: 'restaurant',
+      name: restaurant.name,
+      id: restaurant.id
+    });
+    setShowReportModal(true);
+  };
+
+  const handleReportSubmit = (reportData) => {
+    setReportSuccess(`Report submitted against ${reportTarget.name}. Reference: ${Date.now()}`);
+    setTimeout(() => setReportSuccess(''), 5000);
+    setReportTarget(null);
+  };
+
   const handleRefresh = () => {
     fetchClaims();
   };
@@ -116,8 +141,18 @@ const MyClaims = () => {
       {error && (
         <Row className="mb-3">
           <Col>
-            <Alert variant="danger">
+            <Alert variant="danger" dismissible onClose={() => setError('')}>
               {error}
+            </Alert>
+          </Col>
+        </Row>
+      )}
+
+      {reportSuccess && (
+        <Row className="mb-4">
+          <Col>
+            <Alert variant="success" dismissible onClose={() => setReportSuccess('')}>
+              {reportSuccess}
             </Alert>
           </Col>
         </Row>
@@ -130,90 +165,73 @@ const MyClaims = () => {
               <Card.Body className="text-center">
                 <h5>No Claims Yet</h5>
                 <p>You haven't claimed any food items yet. Browse available food to get started!</p>
-                <Button variant="primary" href="/browse-food">
-                  Browse Donations
-                </Button>
+                <LinkContainer to="/browse-food">
+                  <Button variant="primary">Browse Food Donations</Button>
+                </LinkContainer>
               </Card.Body>
             </Card>
           </Col>
         </Row>
       ) : (
         <Row>
-          <Col>
-            <Card>
-              <Card.Body>
-                <Table responsive striped hover>
-                  <thead>
-                    <tr>
-                      <th>Food Item</th>
-                      <th>Description</th>
-                      <th>Quantity</th>
-                      <th>Status</th>
-                      <th>Pickup Time</th>
-                      <th>Restaurant</th>
-                      <th>Contact</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {claims.map(claim => (
-                      <tr key={claim.id}>
-                        <td><strong>{claim.title}</strong></td>
-                        <td>{claim.description || 'No description'}</td>
-                        <td>{claim.quantity}</td>
-                        <td>
-                          <Badge bg={getStatusVariant(claim.status)}>
-                            {claim.status ? claim.status.charAt(0).toUpperCase() + claim.status.slice(1) : 'Unknown'}
-                          </Badge>
-                        </td>
-                        <td>{claim.pickup_time || 'Not specified'}</td>
-                        <td>
-                          {claim.restaurant ? (
-                            <div>
-                              <strong>{claim.restaurant.name}</strong>
-                              {claim.restaurant.address && (
-                                <><br/><small className="text-muted">{claim.restaurant.address}</small></>
-                              )}
-                            </div>
-                          ) : (
-                            'Restaurant info not available'
-                          )}
-                        </td>
-                        <td>
-                          {claim.restaurant ? (
-                            <div>
-                              <small>
-                                📧 {claim.restaurant.email}<br/>
-                                {claim.restaurant.phone && (
-                                  <>📞 {claim.restaurant.phone}</>
-                                )}
-                              </small>
-                            </div>
-                          ) : (
-                            'Contact info not available'
-                          )}
-                        </td>
-                        <td>
-                          {claim.status === 'claimed' && (
-                            <Button 
-                              variant="outline-danger" 
-                              size="sm"
-                              onClick={() => handleCancelClaim(claim.id)}
-                            >
-                              Cancel
-                            </Button>
-                          )}
-                          {claim.status === 'confirmed' && (
-                            <Badge bg="success">Ready for Pickup</Badge>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </Table>
-              </Card.Body>
-            </Card>
-          </Col>
+          {claims.map(claim => (
+            <Col md={6} lg={4} key={claim.id} className="mb-4">
+              <Card className="h-100">
+                <Card.Body>
+                  <div className="d-flex justify-content-between align-items-start mb-2">
+                    <Card.Title>{claim.title}</Card.Title>
+                    <Badge bg={getStatusVariant(claim.status)}>
+                      {claim.status ? claim.status.charAt(0).toUpperCase() + claim.status.slice(1) : 'Unknown'}
+                    </Badge>
+                  </div>
+                  <Card.Text>{claim.description || 'No description'}</Card.Text>
+                  <div className="mb-3">
+                    <small className="text-muted">
+                      <strong>Quantity:</strong> {claim.quantity}<br/>
+                      <strong>Pickup Time:</strong> {claim.pickup_time || 'Not specified'}<br/>
+                      <strong>Restaurant:</strong> {claim.restaurant?.name || 'Unknown'}<br/>
+                      {claim.restaurant?.address && (
+                        <>
+                          <strong>Address:</strong> {claim.restaurant.address}<br/>
+                        </>
+                      )}
+                      {claim.restaurant?.phone && (
+                        <>
+                          <strong>Phone:</strong> {claim.restaurant.phone}<br/>
+                        </>
+                      )}
+                      <strong>Claimed:</strong> {formatDate(claim.claimed_at || claim.created_at)}
+                    </small>
+                  </div>
+                </Card.Body>
+                <Card.Footer>
+                  <div className="d-flex gap-2">
+                    {claim.status === 'claimed' && (
+                      <Button 
+                        variant="outline-danger" 
+                        size="sm"
+                        onClick={() => handleCancelClaim(claim.id)}
+                      >
+                        Cancel
+                      </Button>
+                    )}
+                    {claim.status === 'confirmed' && (
+                      <Badge bg="success">Ready for Pickup</Badge>
+                    )}
+                    {claim.restaurant && (
+                      <Button
+                        variant="outline-warning"
+                        size="sm"
+                        onClick={() => handleReportRestaurant(claim.restaurant)}
+                      >
+                        Report Restaurant
+                      </Button>
+                    )}
+                  </div>
+                </Card.Footer>
+              </Card>
+            </Col>
+          ))}
         </Row>
       )}
 
@@ -286,6 +304,19 @@ const MyClaims = () => {
           </Button>
         </Modal.Footer>
       </Modal>
+
+      {/* Report Modal */}
+      <ReportModal
+        show={showReportModal}
+        onHide={() => setShowReportModal(false)}
+        reportedEntity={reportTarget}
+        reportedBy={{
+          name: user?.name,
+          id: user?.id,
+          type: user?.role
+        }}
+        onReportSubmit={handleReportSubmit}
+      />
     </Container>
   );
 };

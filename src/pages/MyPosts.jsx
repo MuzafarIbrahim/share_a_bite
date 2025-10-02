@@ -2,18 +2,24 @@ import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Table, Badge, Button, Alert, Spinner, Modal } from 'react-bootstrap';
 import { LinkContainer } from 'react-router-bootstrap';
 import { foodService } from '../services/foodService';
+import { useAuth } from '../context/AuthContext';
+import ReportModal from '../components/ReportModal';
 
 const MyPosts = () => {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  // Add modal states
+  const [deleteLoading, setDeleteLoading] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [postToDelete, setPostToDelete] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportTarget, setReportTarget] = useState(null);
+  const [reportSuccess, setReportSuccess] = useState('');
 
-  // Fetch user's food posts from API
+  const { user } = useAuth();
+
   useEffect(() => {
     fetchPosts();
   }, []);
@@ -45,7 +51,6 @@ const MyPosts = () => {
   const handleDeletePost = async (postId) => {
     const post = posts.find(p => p.id === postId);
     
-    // Check if post can be deleted before showing modal
     if (post?.status === 'claimed') {
       setError('Cannot delete a post that has been claimed. Once claimed, the food should be picked up.');
       return;
@@ -56,7 +61,6 @@ const MyPosts = () => {
       return;
     }
 
-    // Show custom delete confirmation modal
     setPostToDelete(post);
     setShowDeleteModal(true);
   };
@@ -65,13 +69,12 @@ const MyPosts = () => {
     if (!postToDelete) return;
 
     try {
-      setError(''); // Clear any previous errors
-      setShowDeleteModal(false); // Close delete modal
+      setError('');
+      setShowDeleteModal(false);
       
       await foodService.deleteFoodPost(postToDelete.id);
       setPosts(posts.filter(post => post.id !== postToDelete.id));
       
-      // Show custom success modal
       setSuccessMessage('Post deleted successfully!');
       setShowSuccessModal(true);
       
@@ -80,7 +83,6 @@ const MyPosts = () => {
       console.error('Error deleting post:', error);
       setPostToDelete(null);
       
-      // More specific error messages based on response
       if (error.response?.status === 403) {
         setError('You can only delete your own posts.');
       } else if (error.response?.status === 400) {
@@ -89,7 +91,6 @@ const MyPosts = () => {
         setError('Post not found. It may have already been deleted.');
       } else if (error.response?.status === 401) {
         setError('Authentication failed. Please log in again.');
-        // Optionally redirect to login
         setTimeout(() => {
           window.location.href = '/login';
         }, 2000);
@@ -102,13 +103,12 @@ const MyPosts = () => {
 
   const handleMarkCompleted = async (postId) => {
     try {
-      setError(''); // Clear any previous errors
+      setError('');
       await foodService.updateFoodPostStatus(postId, 'completed');
       setPosts(posts.map(post => 
         post.id === postId ? { ...post, status: 'completed' } : post
       ));
       
-      // Show custom success modal
       setSuccessMessage('Post marked as completed!');
       setShowSuccessModal(true);
     } catch (error) {
@@ -129,6 +129,21 @@ const MyPosts = () => {
     } catch {
       return 'N/A';
     }
+  };
+
+  const handleReportOrganization = (claimant) => {
+    setReportTarget({
+      type: 'welfare_organization',
+      name: claimant.name,
+      id: claimant.id
+    });
+    setShowReportModal(true);
+  };
+
+  const handleReportSubmit = (reportData) => {
+    setReportSuccess(`Report submitted against ${reportTarget.name}. Reference: ${Date.now()}`);
+    setTimeout(() => setReportSuccess(''), 5000);
+    setReportTarget(null);
   };
 
   if (loading) {
@@ -164,6 +179,16 @@ const MyPosts = () => {
         <Row className="mb-3">
           <Col>
             <Alert variant="danger">{error}</Alert>
+          </Col>
+        </Row>
+      )}
+
+      {reportSuccess && (
+        <Row className="mb-3">
+          <Col>
+            <Alert variant="success" dismissible onClose={() => setReportSuccess('')}>
+              {reportSuccess}
+            </Alert>
           </Col>
         </Row>
       )}
@@ -265,6 +290,15 @@ const MyPosts = () => {
                                 Delete
                               </Button>
                             )}
+                            {post.claimant && (
+                              <Button
+                                variant="outline-warning"
+                                size="sm"
+                                onClick={() => handleReportOrganization(post.claimant)}
+                              >
+                                Report Organization
+                              </Button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -277,7 +311,6 @@ const MyPosts = () => {
         </Row>
       )}
 
-      {/* Custom Delete Confirmation Modal */}
       <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered>
         <Modal.Header closeButton>
           <Modal.Title>Confirm Delete</Modal.Title>
@@ -305,7 +338,6 @@ const MyPosts = () => {
         </Modal.Footer>
       </Modal>
 
-      {/* Custom Success Modal */}
       <Modal show={showSuccessModal} onHide={() => setShowSuccessModal(false)} centered>
         <Modal.Header closeButton>
           <Modal.Title>Success</Modal.Title>
@@ -324,6 +356,18 @@ const MyPosts = () => {
           </Button>
         </Modal.Footer>
       </Modal>
+
+      <ReportModal
+        show={showReportModal}
+        onHide={() => setShowReportModal(false)}
+        reportedEntity={reportTarget}
+        reportedBy={{
+          name: user?.name,
+          id: user?.id,
+          type: user?.role
+        }}
+        onReportSubmit={handleReportSubmit}
+      />
     </Container>
   );
 };

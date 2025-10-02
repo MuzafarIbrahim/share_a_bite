@@ -3,6 +3,7 @@ import { Container, Row, Col, Card, Button, Badge, Spinner, Alert } from 'react-
 import { LinkContainer } from 'react-router-bootstrap';
 import { useAuth } from '../context/AuthContext';
 import { foodService } from '../services/foodService';
+import ReportModal from '../components/ReportModal';
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -13,6 +14,10 @@ const Dashboard = () => {
   const [recentActivity, setRecentActivity] = useState([]);
   const [activityLoading, setActivityLoading] = useState(true);
   const [activityError, setActivityError] = useState('');
+
+  // Report modal state
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportSuccess, setReportSuccess] = useState('');
 
   // Fetch recent activity data
   useEffect(() => {
@@ -78,6 +83,15 @@ const Dashboard = () => {
       case 'expired': return 'danger';
       default: return 'secondary';
     }
+  };
+
+  const handleReportSubmit = (reportData) => {
+    setReportSuccess(`Report submitted successfully! Reference: ${Date.now()}`);
+    setTimeout(() => setReportSuccess(''), 5000);
+  };
+
+  const openReportModal = () => {
+    setShowReportModal(true);
   };
 
   const renderRecentActivity = () => {
@@ -176,11 +190,21 @@ const Dashboard = () => {
           </p>
         </Col>
       </Row>
+
+      {reportSuccess && (
+        <Row className="mb-4">
+          <Col>
+            <Alert variant="success" dismissible onClose={() => setReportSuccess('')}>
+              {reportSuccess}
+            </Alert>
+          </Col>
+        </Row>
+      )}
       
       <Row>
         {isRestaurant && (
           <>
-            <Col md={6} lg={6} className="mb-4">
+            <Col md={6} lg={4} className="mb-4">
               <Card className="h-100">
                 <Card.Body className="text-center">
                   <h4>Create Food Post</h4>
@@ -192,7 +216,7 @@ const Dashboard = () => {
               </Card>
             </Col>
             
-            <Col md={6} lg={6} className="mb-4">
+            <Col md={6} lg={4} className="mb-4">
               <Card className="h-100">
                 <Card.Body className="text-center">
                   <h4>My Donations</h4>
@@ -203,12 +227,24 @@ const Dashboard = () => {
                 </Card.Body>
               </Card>
             </Col>
+
+            <Col md={6} lg={4} className="mb-4">
+              <Card className="h-100">
+                <Card.Body className="text-center">
+                  <h4>Report Issue</h4>
+                  <p>Report problems with welfare organizations</p>
+                  <Button variant="outline-danger" onClick={openReportModal}>
+                    Submit Report
+                  </Button>
+                </Card.Body>
+              </Card>
+            </Col>
           </>
         )}
         
         {isWelfareOrg && (
           <>
-            <Col md={6} lg={6} className="mb-4">
+            <Col md={6} lg={4} className="mb-4">
               <Card className="h-100">
                 <Card.Body className="text-center">
                   <h4>Browse Donations</h4>
@@ -220,7 +256,7 @@ const Dashboard = () => {
               </Card>
             </Col>
             
-            <Col md={6} lg={6} className="mb-4">
+            <Col md={6} lg={4} className="mb-4">
               <Card className="h-100">
                 <Card.Body className="text-center">
                   <h4>My Claims</h4>
@@ -228,6 +264,18 @@ const Dashboard = () => {
                   <LinkContainer to="/my-claims">
                     <Button variant="warning">View Claims</Button>
                   </LinkContainer>
+                </Card.Body>
+              </Card>
+            </Col>
+
+            <Col md={6} lg={4} className="mb-4">
+              <Card className="h-100">
+                <Card.Body className="text-center">
+                  <h4>Report Issue</h4>
+                  <p>Report problems with restaurants</p>
+                  <Button variant="outline-danger" onClick={openReportModal}>
+                    Submit Report
+                  </Button>
                 </Card.Body>
               </Card>
             </Col>
@@ -245,6 +293,23 @@ const Dashboard = () => {
           </Card>
         </Col>
       </Row>
+
+      {/* Report Modal */}
+      <ReportModal
+        show={showReportModal}
+        onHide={() => setShowReportModal(false)}
+        reportedEntity={{
+          type: isRestaurant ? 'welfare_organization' : 'restaurant',
+          name: 'General Report',
+          id: 'general'
+        }}
+        reportedBy={{
+          name: user?.name,
+          id: user?.id,
+          type: user?.role
+        }}
+        onReportSubmit={handleReportSubmit}
+      />
     </Container>
   );
 };
