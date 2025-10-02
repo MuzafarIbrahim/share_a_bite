@@ -312,21 +312,7 @@ const Home = () => {
       </section>
 
       {/* Footer */}
-      <footer className="bg-dark text-white py-4">
-        <Container>
-          <Row className="align-items-center">
-            <Col md={6}>
-              <h5 className="mb-2">Share a Bite</h5>
-              <p className="mb-0 text-muted">Connecting hearts, sharing hope, ending hunger.</p>
-            </Col>
-            <Col md={6} className="text-md-end">
-              <p className="mb-0 text-muted">
-                &copy; 2024 Share a Bite. Made with ❤️ for humanity.
-              </p>
-            </Col>
-          </Row>
-        </Container>
-      </footer>
+      <footer className="bg-white py-5"></footer>
 
       <style jsx>{`
         .hover-lift:hover {
