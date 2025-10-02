@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Container, Row, Col, Card, Form, Button, Alert } from 'react-bootstrap';
-import { useAuth } from '../context/AuthContext';
-import { useNavigate, Link } from 'react-router-dom';
+import { Container, Row, Col, Card, Form, Button, Alert, Spinner } from 'react-bootstrap';
+import { Link, useNavigate } from 'react-router-dom';
+import { authService } from '../services/authService';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -11,256 +11,409 @@ const Register = () => {
     password: '',
     confirmPassword: '',
     registrationNumber: '',
-    address: '',
-    contactPerson: '',
     phoneNumber: '',
-    registrationCertificate: null
+    contactPerson: '',
+    address: ''
   });
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [loading, setLoading] = useState(false);
-  const { register } = useAuth();
+  const [currentStep, setCurrentStep] = useState(1);
+  
   const navigate = useNavigate();
 
   const handleChange = (e) => {
-    if (e.target.type === 'file') {
-      setFormData({
-        ...formData,
-        [e.target.name]: e.target.files[0]
-      });
-    } else {
-      setFormData({
-        ...formData,
-        [e.target.name]: e.target.value
-      });
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+    setError('');
+  };
+
+  const validateStep1 = () => {
+    if (!formData.organizationName.trim()) {
+      setError('Organization name is required');
+      return false;
     }
+    if (!formData.organizationType) {
+      setError('Please select organization type');
+      return false;
+    }
+    if (!formData.email.trim()) {
+      setError('Email is required');
+      return false;
+    }
+    if (!formData.email.includes('@')) {
+      setError('Please enter a valid email address');
+      return false;
+    }
+    return true;
+  };
+
+  const validateStep2 = () => {
+    if (!formData.password) {
+      setError('Password is required');
+      return false;
+    }
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      return false;
+    }
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match');
+      return false;
+    }
+    if (!formData.registrationNumber.trim()) {
+      setError('Registration number is required');
+      return false;
+    }
+    if (!formData.contactPerson.trim()) {
+      setError('Contact person is required');
+      return false;
+    }
+    if (!formData.phoneNumber.trim()) {
+      setError('Phone number is required');
+      return false;
+    }
+    return true;
+  };
+
+  const handleNext = () => {
+    if (currentStep === 1 && validateStep1()) {
+      setCurrentStep(2);
+      setError('');
+    }
+  };
+
+  const handleBack = () => {
+    setCurrentStep(1);
+    setError('');
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
+    
+    if (!validateStep2()) return;
+
     setLoading(true);
-    
-    console.log('Form submission started with data:', formData); // Debug log
-    
-    // Check all required fields (registration certificate is now optional)
-    const requiredFields = {
-      organizationType: 'Organization Type',
-      organizationName: 'Organization Name', 
-      registrationNumber: 'Registration Number',
-      phoneNumber: 'Phone Number',
-      contactPerson: 'Contact Person Name',
-      email: 'Email Address',
-      address: 'Address',
-      password: 'Password',
-      confirmPassword: 'Confirm Password'
-      // Removed registrationCertificate from required fields
-    };
-    
-    for (const [field, label] of Object.entries(requiredFields)) {
-      if (!formData[field]) {
-        setError(`${label} is required`);
-        setLoading(false);
-        return;
-      }
-    }
-    
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
-      setLoading(false);
-      return;
-    }
-    
+    setError('');
+
     try {
-      // Prepare organization data for backend API
-      const organizationData = {
-        organizationName: formData.organizationName,
-        organizationType: formData.organizationType,
-        email: formData.email,
-        password: formData.password,
-        registrationNumber: formData.registrationNumber,
-        address: formData.address,
-        phoneNumber: formData.phoneNumber,
-        contactPerson: formData.contactPerson,
-        // Include registration certificate only if provided
-        hasRegistrationCertificate: formData.registrationCertificate ? true : false
-      };
-      
-      console.log('Sending registration data to backend:', organizationData);
-      
-      const response = await register(organizationData);
-      console.log('Registration response:', response);
-      
-      // Show success message and redirect to login
-      setSuccess(response.message);
+      await authService.register(formData);
+      setSuccess('Registration successful! Please wait for admin approval before you can login.');
       setTimeout(() => {
         navigate('/login');
       }, 3000);
-      
     } catch (error) {
-      console.error('Registration error details:', error);
-      console.error('Error response:', error.response?.data);
       setError(error.message || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <Container className="py-5">
-      <Row className="justify-content-center">
-        <Col md={8} lg={6}>
-          <Card>
-            <Card.Body>
-              <h2 className="text-center mb-4">Register Your Organization</h2>
-              {error && <Alert variant="danger">{error}</Alert>}
-              {success && <Alert variant="success">{success}</Alert>}
-              <Form onSubmit={handleSubmit}>
-                <Form.Group className="mb-3">
-                  <Form.Label>Organization Type *</Form.Label>
-                  <Form.Select
-                    name="organizationType"
-                    value={formData.organizationType}
-                    onChange={handleChange}
-                    required
-                  >
-                    <option value="">Select organization type</option>
-                    <option value="restaurant">Restaurant</option>
-                    <option value="welfare_organization">Welfare Organization</option>
-                  </Form.Select>
-                </Form.Group>
-                
-                <Form.Group className="mb-3">
-                  <Form.Label>Organization Name *</Form.Label>
-                  <Form.Control
-                    type="text"
-                    name="organizationName"
-                    value={formData.organizationName}
-                    onChange={handleChange}
-                    placeholder="Enter your organization name"
-                    required
-                  />
-                </Form.Group>
-                
-                <Row>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Registration Number *</Form.Label>
-                      <Form.Control
-                        type="text"
-                        name="registrationNumber"
-                        value={formData.registrationNumber}
-                        onChange={handleChange}
-                        placeholder="Official registration number"
-                        required
-                      />
-                    </Form.Group>
-                  </Col>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Phone Number *</Form.Label>
-                      <Form.Control
-                        type="tel"
-                        name="phoneNumber"
-                        value={formData.phoneNumber}
-                        onChange={handleChange}
-                        placeholder="Contact phone number"
-                        required
-                      />
-                    </Form.Group>
-                  </Col>
-                </Row>
-                
-                <Form.Group className="mb-3">
-                  <Form.Label>Contact Person Name *</Form.Label>
-                  <Form.Control
-                    type="text"
-                    name="contactPerson"
-                    value={formData.contactPerson}
-                    onChange={handleChange}
-                    placeholder="Primary contact person"
-                    required
-                  />
-                </Form.Group>
-                
-                <Form.Group className="mb-3">
-                  <Form.Label>Email Address *</Form.Label>
-                  <Form.Control
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    placeholder="Organization email"
-                    required
-                  />
-                </Form.Group>
-                
-                <Form.Group className="mb-3">
-                  <Form.Label>Address *</Form.Label>
-                  <Form.Control
-                    as="textarea"
-                    rows={2}
-                    name="address"
-                    value={formData.address}
-                    onChange={handleChange}
-                    placeholder="Complete organization address"
-                    required
-                  />
-                </Form.Group>
-                
-                <Form.Group className="mb-3">
-                  <Form.Label>Registration Certificate (Optional)</Form.Label>
-                  <Form.Control
-                    type="file"
-                    name="registrationCertificate"
-                    onChange={handleChange}
-                    accept=".pdf,.jpg,.jpeg,.png"
-                  />
-                  <Form.Text className="text-muted">
-                    Upload official registration certificate (PDF, JPG, PNG) - Optional
-                  </Form.Text>
-                </Form.Group>
-                
-                <Row>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Password *</Form.Label>
-                      <Form.Control
-                        type="password"
-                        name="password"
-                        value={formData.password}
-                        onChange={handleChange}
-                        required
-                      />
-                    </Form.Group>
-                  </Col>
-                  <Col md={6}>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Confirm Password *</Form.Label>
-                      <Form.Control
-                        type="password"
-                        name="confirmPassword"
-                        value={formData.confirmPassword}
-                        onChange={handleChange}
-                        required
-                      />
-                    </Form.Group>
-                  </Col>
-                </Row>
-                
-                <Button variant="primary" type="submit" className="w-100" disabled={loading}>
-                  {loading ? 'Registering...' : 'Register Organization'}
-                </Button>
-              </Form>
-              <div className="text-center mt-3">
-                <p>Already registered? <Link to="/login">Login here</Link></p>
-              </div>
-            </Card.Body>
-          </Card>
+  const renderStep1 = () => (
+    <>
+      <div className="text-center mb-4">
+        <div className="mb-3" style={{ fontSize: '4rem' }}>
+          {formData.organizationType === 'restaurant' ? '🏪' : formData.organizationType === 'welfare_organization' ? '🤝' : '📝'}
+        </div>
+        <h3 className="fw-bold text-dark mb-2">Tell Us About Your Organization</h3>
+        <p className="text-muted">
+          Help us understand how you'll make an impact
+        </p>
+      </div>
+
+      <Form.Group className="mb-4">
+        <Form.Label className="fw-semibold text-dark mb-3">
+          What type of organization are you?
+        </Form.Label>
+        <Row>
+          <Col md={6} className="mb-3">
+            <Card 
+              className={`h-100 ${formData.organizationType === 'restaurant' ? 'border-primary bg-primary bg-opacity-10' : 'border-light'}`}
+              onClick={() => setFormData({...formData, organizationType: 'restaurant'})}
+              style={{ cursor: 'pointer' }}
+            >
+              <Card.Body className="text-center p-4">
+                <div style={{ fontSize: '3rem' }}>🏪</div>
+                <h6 className="fw-bold mt-2">Restaurant</h6>
+                <small className="text-muted">Share surplus food with those in need</small>
+              </Card.Body>
+            </Card>
+          </Col>
+          <Col md={6} className="mb-3">
+            <Card 
+              className={`h-100 ${formData.organizationType === 'welfare_organization' ? 'border-success bg-success bg-opacity-10' : 'border-light'}`}
+              onClick={() => setFormData({...formData, organizationType: 'welfare_organization'})}
+              style={{ cursor: 'pointer' }}
+            >
+              <Card.Body className="text-center p-4">
+                <div style={{ fontSize: '3rem' }}>🤝</div>
+                <h6 className="fw-bold mt-2">Welfare Organization</h6>
+                <small className="text-muted">Collect food for community support</small>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+      </Form.Group>
+
+      <Form.Group className="mb-4">
+        <Form.Label className="fw-semibold text-dark mb-2">
+          Organization Name
+        </Form.Label>
+        <Form.Control
+          type="text"
+          name="organizationName"
+          value={formData.organizationName}
+          onChange={handleChange}
+          placeholder="Enter your organization name"
+          required
+          className="form-control"
+        />
+      </Form.Group>
+
+      <Form.Group className="mb-4">
+        <Form.Label className="fw-semibold text-dark mb-2">
+          Email Address
+        </Form.Label>
+        <Form.Control
+          type="email"
+          name="email"
+          value={formData.email}
+          onChange={handleChange}
+          placeholder="Enter your email address"
+          required
+          className="form-control"
+        />
+      </Form.Group>
+    </>
+  );
+
+  const renderStep2 = () => (
+    <>
+      <div className="text-center mb-4">
+        <div className="mb-3" style={{ fontSize: '4rem' }}>
+          🔐
+        </div>
+        <h3 className="fw-bold text-dark mb-2">Complete Your Profile</h3>
+        <p className="text-muted">
+          Final step to join our community
+        </p>
+      </div>
+
+      <Row>
+        <Col md={6}>
+          <Form.Group className="mb-4">
+            <Form.Label className="fw-semibold text-dark mb-2">
+              Password
+            </Form.Label>
+            <Form.Control
+              type="password"
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
+              placeholder="Create a secure password"
+              required
+            />
+          </Form.Group>
+        </Col>
+        <Col md={6}>
+          <Form.Group className="mb-4">
+            <Form.Label className="fw-semibold text-dark mb-2">
+              Confirm Password
+            </Form.Label>
+            <Form.Control
+              type="password"
+              name="confirmPassword"
+              value={formData.confirmPassword}
+              onChange={handleChange}
+              placeholder="Confirm your password"
+              required
+            />
+          </Form.Group>
         </Col>
       </Row>
-    </Container>
+
+      <Row>
+        <Col md={6}>
+          <Form.Group className="mb-4">
+            <Form.Label className="fw-semibold text-dark mb-2">
+              Registration Number
+            </Form.Label>
+            <Form.Control
+              type="text"
+              name="registrationNumber"
+              value={formData.registrationNumber}
+              onChange={handleChange}
+              placeholder="Business registration number"
+              required
+            />
+          </Form.Group>
+        </Col>
+        <Col md={6}>
+          <Form.Group className="mb-4">
+            <Form.Label className="fw-semibold text-dark mb-2">
+              Phone Number
+            </Form.Label>
+            <Form.Control
+              type="tel"
+              name="phoneNumber"
+              value={formData.phoneNumber}
+              onChange={handleChange}
+              placeholder="Contact phone number"
+              required
+            />
+          </Form.Group>
+        </Col>
+      </Row>
+
+      <Form.Group className="mb-4">
+        <Form.Label className="fw-semibold text-dark mb-2">
+          Contact Person
+        </Form.Label>
+        <Form.Control
+          type="text"
+          name="contactPerson"
+          value={formData.contactPerson}
+          onChange={handleChange}
+          placeholder="Primary contact person name"
+          required
+        />
+      </Form.Group>
+
+      <Form.Group className="mb-4">
+        <Form.Label className="fw-semibold text-dark mb-2">
+          Address (Optional)
+        </Form.Label>
+        <Form.Control
+          as="textarea"
+          rows={3}
+          name="address"
+          value={formData.address}
+          onChange={handleChange}
+          placeholder="Your organization's address"
+        />
+      </Form.Group>
+    </>
+  );
+
+  return (
+    <div className="min-vh-100 py-5" style={{
+      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+    }}>
+      <Container>
+        <Row className="justify-content-center">
+          <Col lg={8} md={10}>
+            <Card className="shadow-lg border-0">
+              <Card.Body className="p-5">
+                {/* Progress Indicator */}
+                <div className="text-center mb-4">
+                  <div className="d-flex justify-content-center align-items-center mb-3">
+                    <div className={`rounded-circle d-flex align-items-center justify-content-center me-3 ${currentStep >= 1 ? 'bg-primary text-white' : 'bg-light text-muted'}`} style={{ width: '40px', height: '40px' }}>
+                      1
+                    </div>
+                    <div className={`border-top ${currentStep >= 2 ? 'border-primary' : 'border-light'}`} style={{ width: '100px' }}></div>
+                    <div className={`rounded-circle d-flex align-items-center justify-content-center ms-3 ${currentStep >= 2 ? 'bg-primary text-white' : 'bg-light text-muted'}`} style={{ width: '40px', height: '40px' }}>
+                      2
+                    </div>
+                  </div>
+                  <p className="text-muted mb-0">
+                    Step {currentStep} of 2 - {currentStep === 1 ? 'Organization Details' : 'Account Setup'}
+                  </p>
+                </div>
+
+                <Form onSubmit={currentStep === 2 ? handleSubmit : (e) => e.preventDefault()}>
+                  {error && (
+                    <Alert variant="danger" className="mb-4">
+                      {error}
+                    </Alert>
+                  )}
+
+                  {success && (
+                    <Alert variant="success" className="mb-4">
+                      {success}
+                    </Alert>
+                  )}
+
+                  {currentStep === 1 ? renderStep1() : renderStep2()}
+
+                  {/* Action Buttons */}
+                  <div className="d-flex justify-content-between mt-4">
+                    {currentStep === 1 ? (
+                      <div className="w-100">
+                        <Button
+                          type="button"
+                          onClick={handleNext}
+                          className="w-100"
+                          size="lg"
+                          disabled={!formData.organizationType || !formData.organizationName || !formData.email}
+                        >
+                          Continue to Next Step →
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        <Button
+                          type="button"
+                          onClick={handleBack}
+                          variant="outline-secondary"
+                          className="me-3"
+                        >
+                          ← Back
+                        </Button>
+                        <Button
+                          type="submit"
+                          disabled={loading}
+                          variant="success"
+                          className="flex-grow-1"
+                          size="lg"
+                        >
+                          {loading ? (
+                            <>
+                              <Spinner
+                                as="span"
+                                animation="border"
+                                size="sm"
+                                role="status"
+                                aria-hidden="true"
+                                className="me-2"
+                              />
+                              Creating Account...
+                            </>
+                          ) : (
+                            <>
+                              Create Account
+                            </>
+                          )}
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </Form>
+
+                {/* Login Link */}
+                <div className="text-center mt-4">
+                  <hr />
+                  <p className="text-muted">
+                    Already have an account?{' '}
+                    <Link to="/login" className="text-decoration-none">
+                      Sign in to your account
+                    </Link>
+                  </p>
+                </div>
+
+                {/* Impact Message */}
+                <div className="text-center mt-4 p-3 bg-light rounded">
+                  <small className="text-muted fst-italic">
+                    "Join thousands of organizations making a real difference in the fight against hunger"
+                  </small>
+                </div>
+              </Card.Body>
+            </Card>
+          </Col>
+        </Row>
+      </Container>
+    </div>
   );
 };
 
